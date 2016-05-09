@@ -8,8 +8,7 @@ module Spree
       include ::Virtus.model
 
       attribute :query, String
-      attribute :price_min, Float
-      attribute :price_max, Float
+      attribute :price_ranges, Array
       attribute :taxons, Array
       attribute :browse_mode, Boolean, default: true
       attribute :properties, Hash
@@ -30,13 +29,53 @@ module Spree
             taxons: taxons,
             browse_mode: browse_mode,
             from: from,
-            price_min: price_min,
-            price_max: price_max,
+            price_ranges: price_ranges,
             properties: properties,
             sorting: sorting
           ).to_hash
         )
         search_result.limit(per_page).page(page).records
+      end
+
+      def self.available?
+        begin
+          check = Spree::Product.__elasticsearch__.client.cluster.health
+          return (check and ["yellow", "green"].include?(check["status"]))
+        rescue => e
+          return false
+        end
+      end
+
+      def autocomplete
+        Spree::Product.__elasticsearch__.search({
+          query: {
+            query_string: {
+              query: query,
+              fields: ["name"]
+            }
+          }
+        }).limit(per_page).records
+      end
+
+      def suggestions
+        results = Spree::Product.__elasticsearch__.search({
+          suggest: {
+            text: query,
+            didYouMean: {
+              phrase: {
+                field: "name.did_you_mean",
+                max_errors: 2,
+                direct_generator: [
+                  {
+                    field: "name.did_you_mean",
+                    min_word_length: 1
+                  }
+                ]
+              }
+            }
+          }
+        }).limit(5)
+        results.response[:suggest]["didYouMean"].first.options.map{|o| o["text"]}
       end
 
       protected
@@ -47,13 +86,16 @@ module Spree
         @sorting = params[:sorting]
         @taxons = params[:taxon] unless params[:taxon].nil?
         @browse_mode = params[:browse_mode] unless params[:browse_mode].nil?
+
+        # price
+        @price_ranges ||= []
         if params[:search] && params[:search][:price]
-          # price
-          @price_min = params[:search][:price][:min].to_f
-          @price_max = params[:search][:price][:max].to_f
-          # properties
-          @properties = params[:search][:properties]
+          @price_ranges << [params[:search][:price][:min].to_f, params[:search][:price][:max].to_f]
+        elsif params[:search] && params[:search][:price_range_any]
+          @price_ranges = params[:search][:price_range_any].map{|pr| pr.split('#')}
         end
+        # properties
+        @properties = params[:search][:properties] if params[:search]
 
         @per_page = (params[:per_page].to_i <= 0) ? Spree::Config[:products_per_page] : params[:per_page].to_i
         @page = (params[:page].to_i <= 0) ? 1 : params[:page].to_i

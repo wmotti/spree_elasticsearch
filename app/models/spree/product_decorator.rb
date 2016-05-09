@@ -18,6 +18,7 @@ module Spree
       indexes :properties, type: 'string', index: 'not_analyzed'
     end
 
+    # If available_on is null, the product is considered available
     def as_indexed_json(options={})
       result = as_json({
         methods: [:price, :sku],
@@ -33,6 +34,7 @@ module Spree
           }
         }
       })
+      result[:available_on] ||= Time.now
       result[:properties] = property_list unless property_list.empty?
       result[:taxon_ids] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
       result
@@ -43,8 +45,7 @@ module Spree
       include ::Virtus.model
 
       attribute :from, Integer, default: 0
-      attribute :price_min, Float
-      attribute :price_max, Float
+      attribute :price_ranges, Array
       attribute :properties, Hash
       attribute :query, String
       attribute :taxons, Array
@@ -70,7 +71,7 @@ module Spree
       #       }
       #     }
       #   }
-      #   filter: { range: { price: { lte: , gte: } } },
+      #   filter: { or: [ { range: { price: { lte: , gte: } } } }, { range: { price: { lte: , gte: } } } }],
       #   sort: [],
       #   from: ,
       #   facets:
@@ -133,9 +134,19 @@ module Spree
         result[:query][:filtered][:filter] = { "and" => and_filter } unless and_filter.empty?
 
         # add price filter outside the query because it should have no effect on facets
-        if price_min && price_max && (price_min < price_max)
-          result[:filter] = { range: { price: { gte: price_min, lte: price_max } } }
+        _filters = []
+        price_ranges.each do |range|
+          range.map!(&:to_f)
+          if range[1].nil? or range[0] <= range[1]
+            if range[1].nil?
+              _filters << { range: { price: { gte: range[0] } } }
+            else
+              _filters << { range: { price: { gte: range[0], lte: range[1] } } }
+            end
+          end
         end
+        result[:filter] = {or: _filters} if _filters.any?
+
 
         result
       end
