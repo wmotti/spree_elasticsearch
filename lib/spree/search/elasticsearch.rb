@@ -10,6 +10,7 @@ module Spree
       attribute :query, String
       attribute :price_ranges, Array
       attribute :taxons, Array
+      attribute :brands, Array
       attribute :browse_mode, Boolean, default: true
       attribute :properties, Hash
       attribute :per_page, String
@@ -27,6 +28,7 @@ module Spree
           Spree::Product::ElasticsearchQuery.new(
             query: query,
             taxons: taxons,
+            brands: brands,
             browse_mode: browse_mode,
             from: from,
             price_ranges: price_ranges,
@@ -94,8 +96,12 @@ module Spree
         elsif params[:search] && params[:search][:price_range_any]
           @price_ranges = params[:search][:price_range_any].map{|pr| pr.split('#')}
         end
+
         # properties
         @properties = params[:search][:properties] if params[:search]
+
+        # brands
+        @brands = params[:search][:brand_any] if params[:search]
 
         @per_page = (params[:per_page].to_i <= 0) ? Spree::Config[:products_per_page] : params[:per_page].to_i
         @page = (params[:page].to_i <= 0) ? 1 : params[:page].to_i

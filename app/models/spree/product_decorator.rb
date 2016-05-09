@@ -11,6 +11,7 @@ module Spree
         indexes :did_you_mean, type: 'string', analyzer: 'didYouMean_analyzer'
         indexes :untouched, type: 'string', include_in_all: false, index: 'not_analyzed'
       end
+      indexes :brand, type: 'string', index: 'not_analyzed'
       indexes :description, analyzer: 'snowball'
       indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
       indexes :price, type: 'double'
@@ -23,7 +24,7 @@ module Spree
     def as_indexed_json(options={})
       result = as_json({
         methods: [:price, :sku],
-        only: [:available_on, :description, :name],
+        only: [:available_on, :description, :name, :brand],
         include: {
           variants: {
             only: [:sku],
@@ -50,6 +51,7 @@ module Spree
       attribute :properties, Hash
       attribute :query, String
       attribute :taxons, Array
+      attribute :brands, Array
       attribute :browse_mode, Boolean
       attribute :sorting, String
 
@@ -80,7 +82,7 @@ module Spree
       def to_hash
         q = { match_all: {} }
         unless query.blank? # nil or empty
-          q = { query_string: { query: query, fields: ['name^5','description','sku'], default_operator: 'AND', use_dis_max: true } }
+          q = { query_string: { query: query, fields: ['name^5','description','brand','sku'], default_operator: 'AND', use_dis_max: true } }
         end
         query = q
 
@@ -130,6 +132,7 @@ module Spree
         result[:query][:filtered][:query] = query
         # taxon and property filters have an effect on the facets
         and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
+        and_filter << { terms: { brand: brands, execution: "or" } } unless brands.empty?
         # only return products that are available
         and_filter << { range: { available_on: { lte: "now" } } }
         result[:query][:filtered][:filter] = { "and" => and_filter } unless and_filter.empty?
