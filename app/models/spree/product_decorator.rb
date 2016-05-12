@@ -132,7 +132,7 @@ module Spree
         result[:query][:filtered][:query] = query
         # taxon and property filters have an effect on the facets
         and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
-        and_filter << { terms: { brand: brands, execution: "or" } } unless brands.empty?
+        and_filter << { terms: { brand: brands } } unless brands.empty?
         # only return products that are available
         and_filter << { range: { available_on: { lte: "now" } } }
         result[:query][:filtered][:filter] = { "and" => and_filter } unless and_filter.empty?
