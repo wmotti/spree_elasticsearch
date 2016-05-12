@@ -22,7 +22,7 @@ module Spree
         prepare(params)
       end
 
-      def retrieve_products(paged=true)
+      def retrieve_products(paged=true, includes=[])
         from = (@page - 1) * Spree::Config.products_per_page
         search_result = Spree::Product.__elasticsearch__.search(
           Spree::Product::ElasticsearchQuery.new(
@@ -37,10 +37,10 @@ module Spree
           ).to_hash
         )
         if paged
-          return search_result.limit(per_page).page(page).records
+          return search_result.limit(per_page).page(page).records(includes: includes)
         else
           limit = search_result.limit(1).results.total rescue nil
-          return search_result.limit([limit||1000, 5000].min).records
+          return search_result.limit([limit||1000, 5000].min).records(includes: includes)
         end
       end
 
