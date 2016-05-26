@@ -47,7 +47,11 @@ module Spree
       def self.available?
         begin
           check = Spree::Product.__elasticsearch__.client.cluster.health
-          return (check and ["yellow", "green"].include?(check["status"]))
+          if (check and ["yellow", "green"].include?(check["status"]))
+            return Spree::Product.__elasticsearch__.index_exists?
+          else
+            return false
+          end
         rescue => e
           return false
         end
