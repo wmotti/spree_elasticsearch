@@ -23,24 +23,32 @@ module Spree
       end
 
       def retrieve_products(paged=true, includes=[])
-        from = (@page - 1) * Spree::Config.products_per_page
-        search_result = Spree::Product.__elasticsearch__.search(
-          Spree::Product::ElasticsearchQuery.new(
-            query: query,
-            taxons: taxons,
-            brands: brands,
-            browse_mode: browse_mode,
-            from: from,
-            price_ranges: price_ranges,
-            properties: properties,
-            sorting: sorting
-          ).to_hash
-        )
-        if paged
-          return search_result.limit(per_page).page(page).records(includes: includes)
-        else
-          limit = search_result.limit(1).results.total rescue nil
-          return search_result.limit([limit||1000, 5000].min).records(includes: includes)
+        begin
+          from = (@page - 1) * Spree::Config.products_per_page
+          search_result = Spree::Product.__elasticsearch__.search(
+            Spree::Product::ElasticsearchQuery.new(
+              query: query,
+              taxons: taxons,
+              brands: brands,
+              browse_mode: browse_mode,
+              from: from,
+              price_ranges: price_ranges,
+              properties: properties,
+              sorting: sorting
+            ).to_hash
+          )
+          if paged
+            return search_result.limit(per_page).page(page).records(includes: includes)
+          else
+            limit = search_result.limit(1).results.total rescue nil
+            return search_result.limit([limit||1000, 5000].min).records(includes: includes)
+          end
+        rescue Exception => e
+          Rails.logger.info "ES Exception: #{e.message}"
+          if Rails.env.production? and defined?(Spree::ExceptionMailer)
+            Spree::ExceptionMailer.exception_mail(e).deliver
+          end
+          return Spree::Product.where("1=0")
         end
       end
 
