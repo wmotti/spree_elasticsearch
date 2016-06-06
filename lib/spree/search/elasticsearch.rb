@@ -48,7 +48,7 @@ module Spree
           if Rails.env.production? and defined?(Spree::ExceptionMailer)
             Spree::ExceptionMailer.exception_mail(e).deliver
           end
-          return Spree::Product.where("1=0")
+          return Spree::Product.where("1=0").page(1).per(1)
         end
       end
 

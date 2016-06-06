@@ -10,6 +10,7 @@ module Spree
         indexes :name, type: 'string', analyzer: 'nGram_analyzer', boost: 100
         indexes :did_you_mean, type: 'string', analyzer: 'didYouMean_analyzer'
         indexes :untouched, type: 'string', include_in_all: false, index: 'not_analyzed'
+        indexes :whitespace, type: 'string', include_in_all: false, analyzer: 'whitespace_analyzer'
       end
       indexes :brand, type: 'string', index: 'not_analyzed'
       indexes :description, analyzer: 'snowball'
@@ -80,9 +81,10 @@ module Spree
       #   facets:
       # }
       def to_hash
+        main_field = Spree::Config.search_all_keywords_in_name ? 'name.whitespace' : 'name'
         q = { match_all: {} }
         unless query.blank? # nil or empty
-          q = { query_string: { query: query, fields: ['name^5','description','brand','sku'], default_operator: 'AND', use_dis_max: true } }
+          q = { query_string: { query: query, fields: ["#{main_field}^5",'description','brand','sku'], default_operator: 'AND', use_dis_max: true } }
         end
         query = q
 
