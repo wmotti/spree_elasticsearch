@@ -36,10 +36,10 @@ module Spree
             }
           }
         }
-      })
-      result[:available_on] ||= Time.now
-      result[:properties] = property_list unless property_list.empty?
-      result[:taxon_ids] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
+      }).stringify_keys
+      result["available_on"] ||= Time.now
+      result["properties"] = property_list unless property_list.empty?
+      result["taxon_ids"] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
       result
     end
 
