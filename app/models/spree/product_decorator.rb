@@ -15,9 +15,15 @@ module Spree
       indexes :brand, type: 'string', index: 'not_analyzed'
       indexes :description, analyzer: 'snowball'
       indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
+      indexes :visible, type: 'boolean', include_in_all: false
+      indexes :sellable, type: 'boolean', include_in_all: false
       indexes :price, type: 'double'
       indexes :sku, type: 'string', index: 'not_analyzed'
       indexes :taxon_ids, type: 'string', index: 'not_analyzed'
+      indexes :taxons_position, type: 'object' do
+        indexes :id, type: 'integer', index: 'not_analyzed'
+        indexes :position, type: 'integer', index: 'not_analyzed'
+      end
       indexes :properties, type: 'string', index: 'not_analyzed'
     end
 
@@ -25,7 +31,7 @@ module Spree
     def as_indexed_json(options={})
       result = as_json({
         methods: [:price, :sku],
-        only: [:available_on, :description, :name, :brand],
+        only: [:available_on, :description, :name, :brand, :visible, :sellable],
         include: {
           variants: {
             only: [:sku],
@@ -39,7 +45,8 @@ module Spree
       }).stringify_keys
       result["available_on"] ||= Time.now
       result["properties"] = property_list unless property_list.empty?
-      result["taxon_ids"] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
+      result["taxon_ids"] = taxon_ids unless taxons.empty?
+      result["taxons_position"] = classifications.map{|c| {id: c.taxon_id, position: c.position}} unless classifications.empty?
       result
     end
 
@@ -84,7 +91,14 @@ module Spree
         main_field = Spree::Config.search_all_keywords_in_name ? 'name.whitespace' : 'name'
         q = { match_all: {} }
         unless query.blank? # nil or empty
-          q = { query_string: { query: query, fields: ["#{main_field}^5",'description','brand','sku'], default_operator: 'AND', use_dis_max: true } }
+          q = {
+            query_string: {
+              query: query,
+              fields: ["#{main_field}^5",'description','brand','sku'],
+              default_operator: 'AND',
+              use_dis_max: true
+            }
+          }
         end
         query = q
 
@@ -110,6 +124,11 @@ module Spree
           [ {"price" => { order: "desc" }}, {"name.untouched" => { order: "asc" }}, "_score" ]
         when "score"
           [ "_score", {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }} ]
+        when "taxons_position"
+          [
+            {"taxons_position.position" => { order: "asc", nested_filter: { "term" => { "taxons_position.id" => taxons.first }}}},
+            {"_id" => { order: "asc" }}
+          ]
         else
           [ {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }}, "_score" ]
         end
@@ -137,6 +156,7 @@ module Spree
         and_filter << { terms: { brand: brands } } unless brands.empty?
         # only return products that are available
         and_filter << { range: { available_on: { lte: "now" } } }
+        and_filter << { term: { visible: 1 } }
         result[:query][:filtered][:filter] = { "and" => and_filter } unless and_filter.empty?
 
         # add price filter outside the query because it should have no effect on facets
