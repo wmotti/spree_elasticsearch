@@ -113,6 +113,12 @@ module Spree
           end
         end
 
+        unless taxons.empty?
+          taxons.dup.each do |t|
+            taxons.concat Spree::Taxon.find(t).descendants.flatten.map(&:id)
+          end
+        end
+
         sorting = case @sorting
         when "name_asc"
           [ {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }}, "_score" ]
@@ -125,10 +131,12 @@ module Spree
         when "score"
           [ "_score", {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }} ]
         when "taxons_position"
-          [
-            {"taxons_position.position" => { order: "asc", nested_filter: { "term" => { "taxons_position.id" => taxons.first }}}},
-            {"_id" => { order: "asc" }}
-          ]
+          _s = []
+          taxons.each do |t|
+            _s << {"taxons_position.position" => { order: "asc", nested_filter: { "term" => { "taxons_position.id" => t }}}}
+          end
+          _s << {"_id" => { order: "asc" }}
+          _s
         else
           [ {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }}, "_score" ]
         end
@@ -152,7 +160,8 @@ module Spree
         # add query and filters to filtered
         result[:query][:filtered][:query] = query
         # taxon and property filters have an effect on the facets
-        and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
+
+        and_filter << { terms: { taxon_ids: taxons.uniq } } unless taxons.empty?
         and_filter << { terms: { brand: brands } } unless brands.empty?
         # only return products that are available
         and_filter << { range: { available_on: { lte: "now" } } }

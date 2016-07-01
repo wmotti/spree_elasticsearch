@@ -9,7 +9,7 @@ module Spree
       def update_index
         if Spree::Config.searcher_class.eql?(Spree::Search::Elasticsearch)
           taxon.products.each do |_product|
-            _product.__elasticsearch__.update_document
+            _product.__elasticsearch__.update_document if _product.master
           end
         end
       end
