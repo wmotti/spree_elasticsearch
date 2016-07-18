@@ -20,7 +20,7 @@ module Spree
       indexes :price, type: 'double'
       indexes :sku, type: 'string', index: 'not_analyzed'
       indexes :taxon_ids, type: 'string', index: 'not_analyzed'
-      indexes :taxons_position, type: 'object' do
+      indexes :taxons_position, type: 'nested' do
         indexes :id, type: 'integer', index: 'not_analyzed'
         indexes :position, type: 'integer', index: 'not_analyzed'
       end
@@ -135,7 +135,7 @@ module Spree
           taxons.each do |t|
             _s << {"taxons_position.position" => { order: "asc", nested_filter: { "term" => { "taxons_position.id" => t }}}}
           end
-          _s << {"_id" => { order: "asc" }}
+          _s << {"_uid" => { order: "asc" }}
           _s
         else
           [ {"name.untouched" => { order: "asc" }}, {"price" => { order: "asc" }}, "_score" ]
