@@ -118,7 +118,7 @@ module Spree
         @properties = params[:search][:properties] if params[:search]
 
         # brands
-        @brands = params[:search][:brand_any] if params[:search]
+        @brands = params[:search][:brand_any].compact.map(&:strip).map(&:downcase) if params[:search] and params[:search][:brand_any].is_a?(Array)
 
         @per_page = (params[:per_page].to_i <= 0) ? Spree::Config[:products_per_page] : params[:per_page].to_i
         @page = (params[:page].to_i <= 0) ? 1 : params[:page].to_i

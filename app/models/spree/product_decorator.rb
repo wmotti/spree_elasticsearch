@@ -31,7 +31,7 @@ module Spree
     def as_indexed_json(options={})
       result = as_json({
         methods: [:price, :sku],
-        only: [:available_on, :description, :name, :brand, :visible, :sellable],
+        only: [:available_on, :description, :name, :visible, :sellable],
         include: {
           variants: {
             only: [:sku],
@@ -43,6 +43,7 @@ module Spree
           }
         }
       }).stringify_keys
+      result["brand"] = sanitized_brand
       result["available_on"] ||= Time.now
       result["properties"] = property_list unless property_list.empty?
       result["taxon_ids"] = taxon_ids unless taxons.empty?
