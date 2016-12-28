@@ -13,7 +13,7 @@ module Spree
         indexes :whitespace, type: 'string', include_in_all: false, analyzer: 'whitespace_analyzer'
       end
       indexes :brand, type: 'string', index: 'not_analyzed'
-      indexes :description, analyzer: 'snowball'
+      indexes :description, analyzer: Spree::Config[:elasticsearch_description_analyzer]
       indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
       indexes :visible, type: 'boolean', include_in_all: false
       indexes :sellable, type: 'boolean', include_in_all: false
@@ -43,6 +43,7 @@ module Spree
           }
         }
       }).stringify_keys
+      result["description"] = ActionView::Base.full_sanitizer.sanitize(description)
       result["brand"] = sanitized_brand
       result["available_on"] ||= Time.now
       result["properties"] = property_list unless property_list.empty?
@@ -90,12 +91,18 @@ module Spree
       # }
       def to_hash
         main_field = Spree::Config.search_all_keywords_in_name ? 'name.whitespace' : 'name'
+
+        #es. "name,description^2,brand"
+        fields = ["#{main_field}^5",'description','brand','sku']
+        custom_fields = Spree::Config.elasticsearch_custom_fields.split(',')
+        fields = custom_fields if custom_fields.present?
+
         q = { match_all: {} }
         unless query.blank? # nil or empty
           q = {
             query_string: {
               query: query,
-              fields: ["#{main_field}^5",'description','brand','sku'],
+              fields: fields,
               default_operator: 'AND',
               use_dis_max: true
             }
@@ -151,7 +158,7 @@ module Spree
 
         # basic skeleton
         result = {
-          min_score: 0.1,
+          min_score: Spree::Config.elasticsearch_min_score,
           query: { filtered: {} },
           sort: sorting,
           from: from,
@@ -182,7 +189,6 @@ module Spree
           end
         end
         result[:filter] = {or: _filters} if _filters.any?
-
 
         result
       end
