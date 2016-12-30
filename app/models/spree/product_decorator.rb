@@ -98,7 +98,7 @@ module Spree
 
         #es. "name,description^2,brand"
         fields = ["#{main_field}^5",'description','brand','sku']
-        custom_fields = Spree::Config.elasticsearch_custom_fields.split(',')
+        custom_fields = Spree::Config.elasticsearch_custom_fields.split(',') rescue nil
         fields = custom_fields if custom_fields.present?
 
         q = { match_all: {} }
