@@ -13,7 +13,7 @@ module Spree
         indexes :whitespace, type: 'string', include_in_all: false, analyzer: 'whitespace_analyzer'
       end
       indexes :brand, type: 'string', index: 'not_analyzed'
-      indexes :description, analyzer: Spree::Config[:elasticsearch_description_analyzer]
+      indexes :description, analyzer: 'snowball'
       indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
       indexes :visible, type: 'boolean', include_in_all: false
       indexes :sellable, type: 'boolean', include_in_all: false
@@ -43,7 +43,11 @@ module Spree
           }
         }
       }).stringify_keys
-      result["description"] = ActionView::Base.full_sanitizer.sanitize(description)
+      
+      description.gsub!(/<br[^>]*>/,' ') if description.present?
+      description.gsub!(/></,'> <'.html_safe) if description.present?
+      result["description"] = HTMLEntities.new.decode(ActionView::Base.full_sanitizer.sanitize(description)) if description.present?
+
       result["brand"] = sanitized_brand
       result["available_on"] ||= Time.now
       result["properties"] = property_list unless property_list.empty?
